@@ -1,0 +1,67 @@
+Version=1
+AutoSorting=1
+OnlyRead=0
+OnlyOneFolder=1
+:Begin ""
+!M:0000abcd.mb\!!!!Inbox\仕事\プロジェクトＡ\
+@0:From:a-team@example.com	O	I
+@0:Subject:【プロジェクトＡ】	O	I
+$O:Sort=1
+:End ""
+:Begin ""
+!M:0000abcd.mb\!!!!Inbox\ソフト\表計算\
+@0:Subject:表計算ソフト	O	I
+@0:[body]:マクロ	O	I
+@0:From, Sender, X-Sender:sheet@example.jp	O	I
+$O:Sort=1
+:End ""
+:Begin ""
+!M:0000abcd.mb\!!!!Inbox\お知らせ\メルマガ\
+@0:From:news@example.org	O	I
+@0:*:X-Mailer: ExampleMailer	O	I
+@0:Subject:①新着情報	O	I
+@0:To:list@example.com	O	I
+@0:[body]:配信停止はこちら	O	I
+@0:From:info@example.org	O	I
+$O:Sort=1
+:End ""
+:Begin ""
+!M:0000abcd.mb\!!!!Inbox\お知らせ\セール\
+@0:From:news@example.org	O	I
+$O:Sort=1
+:End ""
+:Begin ""
+!M:0000abcd.mb\!!!!Inbox\ソフト\機能要望\
+@0:Subject:機能要望	O	I
+@0:[body]:ご要望＆ご意見	O	I
+$O:Sort=1
+:End ""
+:Begin ""
+!M:0000abcd.mb\!!!!Inbox\仕事\
+@0:From:@example.com	O	I
+$O:Sort=1
+:End ""
+:Begin ""
+!M:0000abcd.mb\!!!!Inbox\仕事\営業\
+@0:From:sales@example.com	O	I
+$O:Sort=1
+:End ""
+:Begin ""
+!M:0000abcd.mb\!!!!Inbox\仕事\
+@0:To:team@example.com	O	I
+@0:From:boss@example.com	O	I
+$O:Sort=1
+:End ""
+:Begin ""
+!M:0000abcd.mb\!!!!Inbox\迷惑メール\
+@0:Subject:【広告】	O	I
+@0:Subject:未承諾広告※	O	I
+@0:[body]:ＵＲＬをクリック	O	I
+$O:Sort=1
+:End ""
+:Begin ""
+!M:0000abcd.mb\!!!!Inbox\ゴミ箱候補\
+@0:From:noreply@example.jp	O	I
+@0:*:X-Spam-Flag: YES	O	I
+$O:Sort=1
+:End ""
