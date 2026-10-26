@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { FILTER_LABELS, type WarningFilter } from '../warnings';
 
 type Props = {
   hasFile: boolean;
@@ -9,6 +10,8 @@ type Props = {
   hasSelection: boolean;
   ruleCount: number;
   showDiff: boolean;
+  filter: WarningFilter;
+  onFilterChange(filter: WarningFilter): void;
   onOpen(): void;
   onSave(): void;
   onUndo(): void;
@@ -70,6 +73,20 @@ export function Toolbar(p: Props) {
           番へ移動
         </button>
       </form>
+      <span className="sep" />
+      <span className="filter-group" role="group" aria-label="絞り込み">
+        {(Object.keys(FILTER_LABELS) as WarningFilter[]).map((f) => (
+          <button
+            key={f}
+            type="button"
+            aria-pressed={p.filter === f}
+            onClick={() => p.onFilterChange(f)}
+            disabled={!p.hasFile}
+          >
+            {FILTER_LABELS[f]}
+          </button>
+        ))}
+      </span>
     </div>
   );
 }

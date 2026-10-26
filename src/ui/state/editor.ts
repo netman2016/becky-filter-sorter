@@ -41,9 +41,14 @@ export type EditorState = { file: LoadedFile | null; notice: Notice | null };
 export type EditorAction =
   | { type: 'loaded'; fileName: string; bytes: Uint8Array; session?: FileSession }
   | { type: 'loadFailed'; message: string }
-  | { type: 'click'; id: string; shift: boolean; ctrl: boolean }
-  | { type: 'cursor'; delta: number; extend: boolean }
-  | { type: 'selectAll' }
+  // visible: 絞り込み中に表示している行（全体の順序のまま）。省略時は全体が対象
+  | { type: 'click'; id: string; shift: boolean; ctrl: boolean; visible?: string[] }
+  | { type: 'cursor'; delta: number; extend: boolean; visible?: string[] }
+  | { type: 'selectAll'; visible?: string[] }
+  /** 選択を ids に含まれるものだけに絞る（絞り込みの切り替え時） */
+  | { type: 'retainSelection'; ids: string[] }
+  /** そのルールだけを選択して現在位置にする（詳細ペインの #N から） */
+  | { type: 'jumpTo'; id: string }
   | { type: 'clearSelection' }
   | { type: 'moveTo'; index: number }
   | { type: 'moveBy'; delta: number }
@@ -103,7 +108,7 @@ function fileReducer(file: LoadedFile, action: EditorAction): LoadedFile {
     case 'click': {
       const { id, shift, ctrl } = action;
       if (shift && file.anchorId) {
-        return { ...file, selection: rangeIds(file.order, file.anchorId, id), focusId: id };
+        return { ...file, selection: rangeIds(action.visible ?? file.order, file.anchorId, id), focusId: id };
       }
       if (ctrl) {
         const selection = file.selection.includes(id)
@@ -114,23 +119,38 @@ function fileReducer(file: LoadedFile, action: EditorAction): LoadedFile {
       return { ...file, selection: [id], anchorId: id, focusId: id };
     }
     case 'cursor': {
-      if (file.order.length === 0) return file;
-      const current = file.focusId ? file.order.indexOf(file.focusId) : -1;
+      const rows = action.visible ?? file.order;
+      if (rows.length === 0) return file;
+      const current = file.focusId ? rows.indexOf(file.focusId) : -1;
       const next =
         current < 0
           ? action.delta > 0
             ? 0
-            : file.order.length - 1
-          : Math.max(0, Math.min(file.order.length - 1, current + action.delta));
-      const id = file.order[next]!;
+            : rows.length - 1
+          : Math.max(0, Math.min(rows.length - 1, current + action.delta));
+      const id = rows[next]!;
       if (action.extend) {
-        const anchor = file.anchorId ?? id;
-        return { ...file, selection: rangeIds(file.order, anchor, id), anchorId: anchor, focusId: id };
+        const anchor = file.anchorId && rows.includes(file.anchorId) ? file.anchorId : id;
+        return { ...file, selection: rangeIds(rows, anchor, id), anchorId: anchor, focusId: id };
       }
       return { ...file, selection: [id], anchorId: id, focusId: id };
     }
     case 'selectAll':
-      return { ...file, selection: [...file.order] };
+      return { ...file, selection: [...(action.visible ?? file.order)] };
+    case 'retainSelection': {
+      const keep = new Set(action.ids);
+      const selection = file.selection.filter((id) => keep.has(id));
+      if (selection.length === file.selection.length) return file;
+      return {
+        ...file,
+        selection,
+        anchorId: file.anchorId && keep.has(file.anchorId) ? file.anchorId : null,
+        focusId: file.focusId && keep.has(file.focusId) ? file.focusId : null,
+      };
+    }
+    case 'jumpTo':
+      if (!file.order.includes(action.id)) return file;
+      return { ...file, selection: [action.id], anchorId: action.id, focusId: action.id };
     case 'clearSelection':
       return { ...file, selection: [], anchorId: null };
     case 'moveTo':

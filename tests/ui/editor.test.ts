@@ -198,3 +198,43 @@ describe('orderAfterDrop', () => {
     expect(orderAfterDrop(order, ['a', 'c'], 'a', 'c')).toBeNull();
   });
 });
+
+describe('絞り込み中の選択（表示中の行が対象）', () => {
+  const visible = ['r0002', 'r0004', 'r0005'];
+
+  it('↑/↓ は表示中の行だけを移動し、Shift で表示中の行の範囲を選ぶ', () => {
+    let s = run(loaded(), { type: 'cursor', delta: 1, extend: false, visible });
+    expect(s.file!.selection).toEqual(['r0002']);
+    s = run(s, { type: 'cursor', delta: 1, extend: false, visible });
+    expect(s.file!.selection).toEqual(['r0004']);
+    s = run(s, { type: 'cursor', delta: 1, extend: true, visible });
+    expect(s.file!.selection).toEqual(['r0004', 'r0005']);
+  });
+
+  it('Shift クリックは表示中の行の範囲、Ctrl+A は表示中の行すべて', () => {
+    const s = run(loaded(), click('r0002'), { type: 'click', id: 'r0005', shift: true, ctrl: false, visible });
+    expect(s.file!.selection).toEqual(visible);
+    const all = run(loaded(), { type: 'selectAll', visible });
+    expect(all.file!.selection).toEqual(visible);
+  });
+
+  it('移動は全体の順序に対して動く', () => {
+    const s = run(loaded(), { type: 'cursor', delta: 1, extend: false, visible }, { type: 'moveBy', delta: 1 });
+    expect(s.file!.order).toEqual(['r0001', 'r0003', 'r0002', 'r0004', 'r0005']);
+  });
+
+  it('retainSelection は選択を指定の行だけに絞る', () => {
+    const s = run(loaded(), click('r0001'), click('r0004', { ctrl: true }), { type: 'retainSelection', ids: visible });
+    expect(s.file!.selection).toEqual(['r0004']);
+    expect(s.file!.focusId).toBe('r0004');
+    const same = run(s, { type: 'retainSelection', ids: visible });
+    expect(same).toBe(s);
+  });
+
+  it('jumpTo はそのルールだけを選択して現在位置にする', () => {
+    const s = run(loaded(), click('r0001'), click('r0002', { ctrl: true }), { type: 'jumpTo', id: 'r0005' });
+    expect(s.file!.selection).toEqual(['r0005']);
+    expect(s.file!.focusId).toBe('r0005');
+    expect(run(s, { type: 'jumpTo', id: 'r9999' })).toBe(s);
+  });
+});

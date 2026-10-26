@@ -11,12 +11,20 @@ import {
   type DragStartEvent,
 } from '@dnd-kit/core';
 import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import type { Rule } from '../../core';
+import type { Rule, RuleAnalysis } from '../../core';
 import { RuleRow } from './RuleRow';
 
 type Props = {
   rules: Map<string, Rule>;
-  order: string[];
+  /** 表示する行（全体の順序のまま。絞り込み中はその一部） */
+  rows: string[];
+  /** 全体の順序での位置 */
+  positions: Map<string, number>;
+  analysis: ReadonlyMap<string, RuleAnalysis>;
+  /** 絞り込み中（ドラッグ無効） */
+  filtered: boolean;
+  /** 絞り込みの条件から外れたが、選択中なので表示を残している行 */
+  outsideFilter: Set<string>;
   moved: Set<string>;
   selection: string[];
   focusId: string | null;
@@ -25,7 +33,20 @@ type Props = {
   onDraggingChange(dragging: boolean): void;
 };
 
-export function RuleList({ rules, order, moved, selection, focusId, onSelect, onDrop, onDraggingChange }: Props) {
+export function RuleList({
+  rules,
+  rows,
+  positions,
+  analysis,
+  filtered,
+  outsideFilter,
+  moved,
+  selection,
+  focusId,
+  onSelect,
+  onDrop,
+  onDraggingChange,
+}: Props) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
@@ -53,16 +74,25 @@ export function RuleList({ rules, order, moved, selection, focusId, onSelect, on
       }}
       onDragCancel={finish}
     >
-      <SortableContext items={order} strategy={verticalListSortingStrategy}>
+      {filtered && (
+        <p className="filter-note small">
+          絞り込み中はドラッグで移動できません（全体の順序での位置が曖昧になるため）。キー操作・ボタンでは全体の順序に対して移動できます。
+        </p>
+      )}
+      <SortableContext items={rows} strategy={verticalListSortingStrategy} disabled={filtered}>
         <ol className="rule-list" role="listbox" aria-multiselectable="true" aria-label="ルール一覧（上から順に評価）">
-          {order.map((id, index) => (
+          {rows.length === 0 && <li className="empty-row muted">該当するルールはありません。</li>}
+          {rows.map((id) => (
             <RuleRow
               key={id}
               rule={rules.get(id)!}
-              index={index}
+              index={positions.get(id)!}
               moved={moved.has(id)}
               selected={selected.has(id)}
               focused={focusId === id}
+              analysis={analysis.get(id)}
+              dragDisabled={filtered}
+              outsideFilter={outsideFilter.has(id)}
               onSelect={onSelect}
             />
           ))}

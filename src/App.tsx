@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type MouseEvent } from 'react';
-import { isOnlyReordered, movedRuleIds, serialize } from './core';
+import { analyzeRules, isOnlyReordered, movedRuleIds, serialize } from './core';
 import { DetailPane } from './ui/components/DetailPane';
 import { DiffPanel } from './ui/components/DiffPanel';
 import { RuleList } from './ui/components/RuleList';
 import { SaveDialog } from './ui/components/SaveDialog';
 import { Toolbar } from './ui/components/Toolbar';
+import { WarningSummary } from './ui/components/WarningSummary';
 import { browserSaveEnv, isFileSystemAccessSupported, openFile, saveFile } from './ui/fs/fileAccess';
 import { backupFileName } from './ui/fs/outcome';
 import { editorReducer, initialEditorState, isDirty } from './ui/state/editor';
+import { matchesFilter, type WarningFilter } from './ui/warnings';
 
 function isEditableTarget(target: EventTarget | null): boolean {
   return (
@@ -24,6 +26,7 @@ export default function App() {
   const [state, dispatch] = useReducer(editorReducer, initialEditorState);
   const [busy, setBusy] = useState(false);
   const [showDiff, setShowDiff] = useState(false);
+  const [filter, setFilter] = useState<WarningFilter>('all');
   // ダイアログに表示した .bak 名と実際の .bak 名を一致させるため、時刻はダイアログを開いた時点で固定する
   const [saveDialog, setSaveDialog] = useState<{ now: Date; backupName: string } | null>(null);
   const draggingRef = useRef(false);
@@ -44,6 +47,46 @@ export default function App() {
     () => (baseOrder && order ? movedRuleIds(baseOrder, order) : new Set<string>()),
     [baseOrder, order],
   );
+  // 並び替えの警告（並び替え・Undo/Redo・保存後の再読み込みのたびに再計算）
+  const warnings = useMemo(() => (doc && order ? analyzeRules(doc.rules, order) : null), [doc, order]);
+  const analysisById = useMemo(() => warnings?.byId ?? new Map(), [warnings]);
+  const positions = useMemo(() => new Map((order ?? []).map((id, i) => [id, i])), [order]);
+  const selection = file?.selection;
+  const selectionSet = useMemo(() => new Set(selection ?? []), [selection]);
+  // 表示する行: 条件に合う行 + 条件から外れた選択中の行（全体の順序のまま）
+  const { rows, outsideFilter } = useMemo(() => {
+    const outside = new Set<string>();
+    const visibleRows = (order ?? []).filter((id) => {
+      if (matchesFilter(analysisById.get(id), filter)) return true;
+      if (selectionSet.has(id)) {
+        outside.add(id);
+        return true;
+      }
+      return false;
+    });
+    return { rows: visibleRows, outsideFilter: outside };
+  }, [order, analysisById, filter, selectionSet]);
+  const filtered = filter !== 'all';
+  const visibleArg = filtered ? rows : undefined;
+
+  const changeFilter = useCallback(
+    (next: WarningFilter) => {
+      setFilter(next);
+      if (next !== 'all' && order) {
+        dispatch({ type: 'retainSelection', ids: order.filter((id) => matchesFilter(analysisById.get(id), next)) });
+      }
+    },
+    [order, analysisById],
+  );
+
+  const jumpTo = useCallback(
+    (id: string) => {
+      if (!matchesFilter(analysisById.get(id), filter)) setFilter('all');
+      dispatch({ type: 'jumpTo', id });
+    },
+    [analysisById, filter],
+  );
+
   const canSave = dirty && verified;
   const canOverwrite = Boolean(file?.session.fileHandle) && isFileSystemAccessSupported();
 
@@ -72,6 +115,7 @@ export default function App() {
         session: { fileName: opened.fileName, fileHandle: opened.fileHandle, dirHandle: null },
       });
       setShowDiff(false);
+      setFilter('all');
     } catch (e) {
       dispatch({ type: 'loadFailed', message: `ファイルを開けませんでした（${errorName(e)}）。` });
     }
@@ -112,23 +156,28 @@ export default function App() {
       else if (e.altKey && !ctrl && key === 'ArrowDown') dispatch({ type: 'moveBy', delta: 1 });
       else if (e.altKey && !ctrl && key === 'Home') dispatch({ type: 'moveTop' });
       else if (e.altKey && !ctrl && key === 'End') dispatch({ type: 'moveBottom' });
-      else if (!e.altKey && !ctrl && key === 'ArrowUp') dispatch({ type: 'cursor', delta: -1, extend: e.shiftKey });
-      else if (!e.altKey && !ctrl && key === 'ArrowDown') dispatch({ type: 'cursor', delta: 1, extend: e.shiftKey });
+      else if (!e.altKey && !ctrl && key === 'ArrowUp')
+        dispatch({ type: 'cursor', delta: -1, extend: e.shiftKey, visible: visibleArg });
+      else if (!e.altKey && !ctrl && key === 'ArrowDown')
+        dispatch({ type: 'cursor', delta: 1, extend: e.shiftKey, visible: visibleArg });
       else if (ctrl && !e.altKey && key.toLowerCase() === 'z' && !e.shiftKey) dispatch({ type: 'undo' });
       else if (ctrl && !e.altKey && (key.toLowerCase() === 'y' || (key.toLowerCase() === 'z' && e.shiftKey)))
         dispatch({ type: 'redo' });
-      else if (ctrl && !e.altKey && key.toLowerCase() === 'a') dispatch({ type: 'selectAll' });
+      else if (ctrl && !e.altKey && key.toLowerCase() === 'a') dispatch({ type: 'selectAll', visible: visibleArg });
       else if (key === 'Escape') dispatch({ type: 'clearSelection' });
       else handled = false;
       if (handled) e.preventDefault();
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [state.file, busy, saveDialog]);
+  }, [state.file, busy, saveDialog, visibleArg]);
 
-  const onSelect = useCallback((id: string, e: MouseEvent) => {
-    dispatch({ type: 'click', id, shift: e.shiftKey, ctrl: e.ctrlKey || e.metaKey });
-  }, []);
+  const onSelect = useCallback(
+    (id: string, e: MouseEvent) => {
+      dispatch({ type: 'click', id, shift: e.shiftKey, ctrl: e.ctrlKey || e.metaKey, visible: visibleArg });
+    },
+    [visibleArg],
+  );
   const onDrop = useCallback((activeId: string, overId: string) => dispatch({ type: 'drop', activeId, overId }), []);
   const onDraggingChange = useCallback((dragging: boolean) => {
     draggingRef.current = dragging;
@@ -153,6 +202,8 @@ export default function App() {
           hasSelection={Boolean(file?.selection.length)}
           ruleCount={file?.order.length ?? 0}
           showDiff={showDiff}
+          filter={filter}
+          onFilterChange={changeFilter}
           onOpen={handleOpen}
           onSave={handleSaveRequest}
           onUndo={() => dispatch({ type: 'undo' })}
@@ -177,6 +228,7 @@ export default function App() {
             {dirty ? '・未保存の変更あり' : ''}
           </p>
         )}
+        {warnings && <WarningSummary counts={warnings.counts} />}
       </header>
 
       {file ? (
@@ -185,7 +237,11 @@ export default function App() {
             {showDiff && <DiffPanel dirty={dirty} verified={verified} movedRules={movedRules} />}
             <RuleList
               rules={rulesById}
-              order={file.order}
+              rows={rows}
+              positions={positions}
+              analysis={analysisById}
+              filtered={filtered}
+              outsideFilter={outsideFilter}
               moved={moved}
               selection={file.selection}
               focusId={file.focusId}
@@ -194,7 +250,13 @@ export default function App() {
               onDraggingChange={onDraggingChange}
             />
           </section>
-          <DetailPane rules={selectedRules} positionOf={positionOf} />
+          <DetailPane
+            rules={selectedRules}
+            rulesById={rulesById}
+            analysis={analysisById}
+            positionOf={positionOf}
+            onJump={jumpTo}
+          />
         </main>
       ) : (
         <main className="empty">
