@@ -1,15 +1,24 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type MouseEvent } from 'react';
-import { analyzeRules, isOnlyReordered, movedRuleIds, serialize } from './core';
+import {
+  analyzeRules,
+  isOnlyReordered,
+  movedRuleIds,
+  nextWarningTarget,
+  serialize,
+  WARNING_TARGET_KINDS,
+  warningPosition,
+  type WarningTargetKind,
+} from './core';
 import { DetailPane } from './ui/components/DetailPane';
 import { DiffPanel } from './ui/components/DiffPanel';
 import { RuleList } from './ui/components/RuleList';
 import { SaveDialog } from './ui/components/SaveDialog';
 import { Toolbar } from './ui/components/Toolbar';
-import { WarningSummary } from './ui/components/WarningSummary';
+import { WarningSummary, type WarningPosition } from './ui/components/WarningSummary';
 import { browserSaveEnv, isFileSystemAccessSupported, openFile, saveFile } from './ui/fs/fileAccess';
 import { backupFileName } from './ui/fs/outcome';
-import { editorReducer, initialEditorState, isDirty } from './ui/state/editor';
-import { filterAfterJump, matchesFilter, type WarningFilter } from './ui/warnings';
+import { canMoveBy, editorReducer, initialEditorState, isDirty, PAGE_MOVE_STEP } from './ui/state/editor';
+import { filterAfterJump, matchesFilter, warningJumpMessage, type WarningFilter } from './ui/warnings';
 
 function isEditableTarget(target: EventTarget | null): boolean {
   return (
@@ -29,6 +38,8 @@ export default function App() {
   const [filter, setFilter] = useState<WarningFilter>('all');
   // ダイアログに表示した .bak 名と実際の .bak 名を一致させるため、時刻はダイアログを開いた時点で固定する
   const [saveDialog, setSaveDialog] = useState<{ now: Date; backupName: string } | null>(null);
+  // 警告ジャンプの通知（同じ文が続いても読み上げられるよう、tick で末尾を切り替える）
+  const [announce, setAnnounce] = useState({ text: '', tick: 0 });
   const draggingRef = useRef(false);
   const file = state.file;
 
@@ -91,6 +102,35 @@ export default function App() {
       dispatch({ type: 'jumpTo', id });
     },
     [filter, matchingIds],
+  );
+
+  // 10件上 / 10件下 で動かせるか（端で動かせないときはボタンを無効にする）
+  const { canMovePageUp, canMovePageDown } = useMemo(() => {
+    if (!file) return { canMovePageUp: false, canMovePageDown: false };
+    return { canMovePageUp: canMoveBy(file, -PAGE_MOVE_STEP), canMovePageDown: canMoveBy(file, PAGE_MOVE_STEP) };
+  }, [file]);
+
+  // 警告の種類ごとの位置表示。「いま選択しているルール」は、選択に含まれる anchor
+  const anchorId = file?.anchorId ?? null;
+  const currentId = anchorId && selectionSet.has(anchorId) ? anchorId : null;
+  const warningPositions = useMemo(() => {
+    const out = {} as Record<WarningTargetKind, WarningPosition>;
+    for (const kind of WARNING_TARGET_KINDS) out[kind] = warningPosition(order ?? [], analysisById, kind, currentId);
+    return out;
+  }, [order, analysisById, currentId]);
+
+  const stepWarning = useCallback(
+    (kind: WarningTargetKind, direction: 1 | -1) => {
+      if (!order) return;
+      const id = nextWarningTarget(order, analysisById, kind, anchorId, direction);
+      if (!id) return;
+      jumpTo(id);
+      const pos = warningPosition(order, analysisById, kind, id);
+      if (pos.index !== null) {
+        setAnnounce((a) => ({ text: warningJumpMessage(kind, pos.index!, pos.total), tick: a.tick + 1 }));
+      }
+    },
+    [order, analysisById, anchorId, jumpTo],
   );
 
   const canSave = dirty && verified;
@@ -162,6 +202,8 @@ export default function App() {
       else if (e.altKey && !ctrl && key === 'ArrowDown') dispatch({ type: 'moveBy', delta: 1 });
       else if (e.altKey && !ctrl && key === 'Home') dispatch({ type: 'moveTop' });
       else if (e.altKey && !ctrl && key === 'End') dispatch({ type: 'moveBottom' });
+      else if (e.altKey && !ctrl && key === 'PageUp') dispatch({ type: 'moveBy', delta: -PAGE_MOVE_STEP });
+      else if (e.altKey && !ctrl && key === 'PageDown') dispatch({ type: 'moveBy', delta: PAGE_MOVE_STEP });
       else if (!e.altKey && !ctrl && key === 'ArrowUp')
         dispatch({ type: 'cursor', delta: -1, extend: e.shiftKey, visible: visibleArg });
       else if (!e.altKey && !ctrl && key === 'ArrowDown')
@@ -206,6 +248,8 @@ export default function App() {
           canUndo={Boolean(file?.past.length)}
           canRedo={Boolean(file?.future.length)}
           hasSelection={Boolean(file?.selection.length)}
+          canMovePageUp={canMovePageUp}
+          canMovePageDown={canMovePageDown}
           ruleCount={file?.order.length ?? 0}
           showDiff={showDiff}
           filter={filter}
@@ -217,6 +261,8 @@ export default function App() {
           onToggleDiff={() => setShowDiff((v) => !v)}
           onMoveTop={() => dispatch({ type: 'moveTop' })}
           onMoveBottom={() => dispatch({ type: 'moveBottom' })}
+          onMovePageUp={() => dispatch({ type: 'moveBy', delta: -PAGE_MOVE_STEP })}
+          onMovePageDown={() => dispatch({ type: 'moveBy', delta: PAGE_MOVE_STEP })}
           onMoveTo={(index) => dispatch({ type: 'moveTo', index })}
         />
         {state.notice && (
@@ -234,7 +280,14 @@ export default function App() {
             {dirty ? '・未保存の変更あり' : ''}
           </p>
         )}
-        {warnings && <WarningSummary counts={warnings.counts} />}
+        {warnings && (
+          <WarningSummary
+            counts={warnings.counts}
+            positions={warningPositions}
+            onStep={stepWarning}
+            announcement={announce.text + (announce.tick % 2 === 1 ? '\u200b' : '')}
+          />
+        )}
       </header>
 
       {file ? (
@@ -275,7 +328,8 @@ export default function App() {
       )}
 
       <footer className="app-footer small muted">
-        ↑↓: 選択 / Shift+↑↓: 範囲選択 / Alt+↑↓: 1 つ移動 / Alt+Home・End: 先頭・末尾へ / Ctrl+Z・Y: 元に戻す・やり直し /
+        ↑↓: 選択 / Shift+↑↓: 範囲選択 / Alt+↑↓: 1 つ移動 / Alt+PageUp・PageDown: {PAGE_MOVE_STEP} 件移動 /
+        Alt+Home・End: 先頭・末尾へ / Ctrl+Z・Y: 元に戻す・やり直し /
         Ctrl+A: すべて選択 / Esc: 選択解除
       </footer>
 

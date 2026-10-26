@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { PAGE_MOVE_STEP } from '../state/editor';
 import { FILTER_LABELS, type WarningFilter } from '../warnings';
 
 type Props = {
@@ -8,6 +9,9 @@ type Props = {
   canUndo: boolean;
   canRedo: boolean;
   hasSelection: boolean;
+  /** 10件上 / 10件下 で 1 件以上動かせるか */
+  canMovePageUp: boolean;
+  canMovePageDown: boolean;
   ruleCount: number;
   showDiff: boolean;
   filter: WarningFilter;
@@ -19,6 +23,8 @@ type Props = {
   onToggleDiff(): void;
   onMoveTop(): void;
   onMoveBottom(): void;
+  onMovePageUp(): void;
+  onMovePageDown(): void;
   onMoveTo(position: number): void;
 };
 
@@ -26,6 +32,17 @@ export function Toolbar(p: Props) {
   const [position, setPosition] = useState('');
   const target = Number(position);
   const validTarget = Number.isInteger(target) && target >= 1 && target <= p.ruleCount;
+  const filtered = p.filter !== 'all';
+  // 絞り込み中も、表示中の行ではなく全体の並び順で動かすことを表記とツールチップで示す
+  const pageLabel = (dir: '上' | '下') => `${PAGE_MOVE_STEP}件${dir}${filtered ? '（全体）' : ''}`;
+  const pageTitle = (dir: '上' | '下', key: string, canMove: boolean) =>
+    [
+      key,
+      filtered ? `絞り込み中も全体の順序で ${PAGE_MOVE_STEP} 件動かします` : '',
+      p.hasSelection && !canMove ? `これ以上${dir}へ動かせません` : '',
+    ]
+      .filter(Boolean)
+      .join(' / ');
 
   return (
     <div className="toolbar" role="toolbar" aria-label="操作">
@@ -48,6 +65,22 @@ export function Toolbar(p: Props) {
       <span className="sep" />
       <button type="button" onClick={p.onMoveTop} disabled={!p.hasSelection || p.busy} title="Alt+Home">
         先頭へ
+      </button>
+      <button
+        type="button"
+        onClick={p.onMovePageUp}
+        disabled={!p.canMovePageUp || p.busy}
+        title={pageTitle('上', 'Alt+PageUp', p.canMovePageUp)}
+      >
+        {pageLabel('上')}
+      </button>
+      <button
+        type="button"
+        onClick={p.onMovePageDown}
+        disabled={!p.canMovePageDown || p.busy}
+        title={pageTitle('下', 'Alt+PageDown', p.canMovePageDown)}
+      >
+        {pageLabel('下')}
       </button>
       <button type="button" onClick={p.onMoveBottom} disabled={!p.hasSelection || p.busy} title="Alt+End">
         末尾へ
