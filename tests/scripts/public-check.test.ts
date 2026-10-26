@@ -44,6 +44,7 @@ describe('ドメインの抽出と許可判定', () => {
       'react@19.3.1',
       '@dnd-kit/core',
       'node 22.12.0',
+      '${{ steps.deployment.outputs.page_url }}',
     ].join('\n');
     expect(extractHosts(text)).toEqual([]);
   });

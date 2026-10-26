@@ -18,7 +18,8 @@ export const SECOND_LEVEL_LABELS = new Set(['co', 'com', 'net', 'org', 'ne', 'or
 
 const URL_RE = /\b[a-z][a-z0-9+.-]*:\/\/([^\s/?#"'`<>()[\]{}\\]+)/gi;
 const EMAIL_RE = /[a-z0-9._%+-]*@((?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,})(?![a-z0-9-])/gi;
-const BARE_RE = /(?<![a-z0-9@.-])((?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,})(?![a-z0-9-])/gi;
+// 識別子の一部（`outputs.page_url` など）を拾わないよう、前後が _ のものも除く
+const BARE_RE = /(?<![a-z0-9_@.-])((?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,})(?![a-z0-9_-])/gi;
 const IPV4_RE = /(?<![\d.])(\d{1,3}(?:\.\d{1,3}){3})(?![\d.])/g;
 
 /** URL の authority からホスト名を取り出す（userinfo・ポートを除く） */
