@@ -14,6 +14,14 @@ export { parseIFilter } from './parse';
 export { orderedRules, serialize } from './serialize';
 export { isOnlyReordered, movedRuleIds, moveRules, moveRulesBy } from './reorder';
 export {
+  hasWarningKind,
+  nextWarningTarget,
+  WARNING_TARGET_KINDS,
+  warningPosition,
+  warningTargets,
+  type WarningTargetKind,
+} from './navigate';
+export {
   analyzeRules,
   conditionCovers,
   fieldSetCovers,

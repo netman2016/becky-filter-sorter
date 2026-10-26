@@ -16,27 +16,33 @@ export function moveRules(order: readonly string[], ids: readonly string[], toIn
 }
 
 /**
- * ids のルールを delta だけずらす（Alt+↑/↓ 用）。選択が飛び飛びでも間隔を保つ。
+ * ids のルールを delta だけずらす（Alt+↑/↓、10件上/下 用）。選択が飛び飛びでも間隔を保つ。
  * 端に達したルールはそこで止まり、そのすぐ隣の選択ルールも止まる。
+ * |delta| ≥ 2 は「1 つずつの移動を |delta| 回くり返し、動かせなくなったら止める」と同じ結果になる。
  */
 export function moveRulesBy(order: readonly string[], ids: readonly string[], delta: number): string[] {
   const moving = new Set(ids);
   const out = [...order];
   const steps = Math.abs(Math.trunc(delta));
   for (let s = 0; s < steps; s++) {
+    let changed = false;
     if (delta < 0) {
       for (let i = 1; i < out.length; i++) {
         if (moving.has(out[i]!) && !moving.has(out[i - 1]!)) {
           [out[i - 1], out[i]] = [out[i]!, out[i - 1]!];
+          changed = true;
         }
       }
     } else {
       for (let i = out.length - 2; i >= 0; i--) {
         if (moving.has(out[i]!) && !moving.has(out[i + 1]!)) {
           [out[i], out[i + 1]] = [out[i + 1]!, out[i]!];
+          changed = true;
         }
       }
     }
+    // 1 つも動かせなかったら、以降のくり返しでも変化しない
+    if (!changed) break;
   }
   return out;
 }
