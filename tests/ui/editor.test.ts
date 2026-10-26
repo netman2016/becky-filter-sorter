@@ -135,7 +135,8 @@ describe('保存結果', () => {
       type: 'saveFinished',
       outcome: { kind: 'verify-failed', fileName: 'IFilter.def', backupName: 'IFilter.def.bak-20261025-120000' },
     });
-    expect(s.file).toBe(moved.file);
+    expect(s.file!.order).toBe(moved.file!.order);
+    expect(s.file!.baseBytes).toBe(moved.file!.baseBytes);
     expect(isDirty(s.file!)).toBe(true);
     expect(s.notice!.level).toBe('error');
     expect(s.notice!.message).toContain('IFilter.def.bak-20261025-120000 を元の名前（IFilter.def）に戻して（コピーして）ください');
@@ -147,12 +148,27 @@ describe('保存結果', () => {
       type: 'saveFinished',
       outcome: { kind: 'downloaded', fileName: 'IFilter.def', backupName: 'b', viaFallback: true },
     });
-    expect(d.file).toBe(moved.file);
+    expect(d.file!.baseOrder).toBe(moved.file!.baseOrder);
+    expect(d.file!.order).toBe(moved.file!.order);
     expect(d.notice!.message).toContain('フォルダを選べなかったため');
     expect(d.notice!.message).toContain('再度ファイルを開き直してください');
     const a = run(moved, { type: 'saveFinished', outcome: { kind: 'aborted', reason: 'changed-on-disk' } });
-    expect(a.file).toBe(moved.file);
+    expect(a.file!.baseBytes).toBe(moved.file!.baseBytes);
     expect(a.notice!.message).toContain('変更していません');
+  });
+
+  it('保存で選ばれたフォルダはセッションに残り、saved で基準を更新しても保持される', () => {
+    const moved = run(loaded(), click('r0005'), { type: 'moveTop' });
+    const dir = { getFileHandle: async () => { throw new Error('unused'); } };
+    const bytes = serialize(moved.file!.doc, moved.file!.order);
+    const s = run(moved, {
+      type: 'saveFinished',
+      outcome: { kind: 'saved', bytes, fileName: 'IFilter.def', backupName: 'b' },
+      dirHandle: dir,
+    });
+    expect(s.file!.session.dirHandle).toBe(dir);
+    const cleared = run(s, { type: 'saveFinished', outcome: { kind: 'aborted', reason: 'not-same-file' }, dirHandle: null });
+    expect(cleared.file!.session.dirHandle).toBeNull();
   });
 
   it('fallback-download は案内を出さない（続けてダウンロード保存する）', () => {

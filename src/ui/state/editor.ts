@@ -7,6 +7,7 @@ import {
   type FilterDocument,
   type ParseWarning,
 } from '../../core';
+import type { DirectoryHandleLike, FileSession } from '../fs/fileAccess';
 import type { SaveOutcome } from '../fs/outcome';
 import { orderAfterDrop } from './dropIndex';
 
@@ -16,6 +17,8 @@ export type Notice = { level: 'info' | 'error'; message: string };
 
 export type LoadedFile = {
   fileName: string;
+  /** 開いたファイルのハンドルと、保存用に選ばれたフォルダ（値として保持するだけ） */
+  session: FileSession;
   doc: FilterDocument;
   warnings: ParseWarning[];
   /** 基準（読み込み時、または保存して確認できた時点）のバイト列 */
@@ -36,7 +39,7 @@ export type LoadedFile = {
 export type EditorState = { file: LoadedFile | null; notice: Notice | null };
 
 export type EditorAction =
-  | { type: 'loaded'; fileName: string; bytes: Uint8Array }
+  | { type: 'loaded'; fileName: string; bytes: Uint8Array; session?: FileSession }
   | { type: 'loadFailed'; message: string }
   | { type: 'click'; id: string; shift: boolean; ctrl: boolean }
   | { type: 'cursor'; delta: number; extend: boolean }
@@ -49,17 +52,18 @@ export type EditorAction =
   | { type: 'drop'; activeId: string; overId: string }
   | { type: 'undo' }
   | { type: 'redo' }
-  | { type: 'saveFinished'; outcome: SaveOutcome }
+  | { type: 'saveFinished'; outcome: SaveOutcome; dirHandle?: DirectoryHandleLike | null }
   | { type: 'notice'; notice: Notice | null };
 
 export const initialEditorState: EditorState = { file: null, notice: null };
 
 /** ファイルを読み込んで状態を作る。形式エラーは ParseError（行番号と種別のみ） */
-function loadFile(fileName: string, bytes: Uint8Array): LoadedFile {
+function loadFile(fileName: string, bytes: Uint8Array, session?: FileSession): LoadedFile {
   const { doc, warnings } = parseIFilter(bytes);
   const order = doc.rules.map((r) => r.id);
   return {
     fileName,
+    session: session ?? { fileName, fileHandle: null, dirHandle: null },
     doc,
     warnings,
     baseBytes: bytes,
@@ -169,7 +173,7 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
   switch (action.type) {
     case 'loaded':
       try {
-        return { file: loadFile(action.fileName, action.bytes), notice: null };
+        return { file: loadFile(action.fileName, action.bytes, action.session), notice: null };
       } catch (e) {
         return { ...state, notice: { level: 'error', message: loadErrorMessage(e) } };
       }
@@ -178,22 +182,29 @@ export function editorReducer(state: EditorState, action: EditorAction): EditorS
     case 'notice':
       return { ...state, notice: action.notice };
     case 'saveFinished':
-      return applySaveOutcome(state, action.outcome);
+      return applySaveOutcome(state, action.outcome, action.dirHandle);
   }
   if (!state.file) return state;
   const file = fileReducer(state.file, action);
   return file === state.file ? state : { ...state, file };
 }
 
-function applySaveOutcome(state: EditorState, outcome: SaveOutcome): EditorState {
+function applySaveOutcome(
+  state: EditorState,
+  outcome: SaveOutcome,
+  dirHandle: DirectoryHandleLike | null | undefined,
+): EditorState {
   const notice = describeSaveOutcome(outcome);
-  if (outcome.kind !== 'saved' || !state.file) return { ...state, notice };
+  if (!state.file) return { ...state, notice };
+  const session =
+    dirHandle === undefined ? state.file.session : { ...state.file.session, dirHandle };
+  if (outcome.kind !== 'saved') return { file: { ...state.file, session }, notice };
   // 書き込みを読み戻して一致を確認できたときだけ、新しい基準にする
   try {
-    return { file: loadFile(outcome.fileName, outcome.bytes), notice };
+    return { file: loadFile(outcome.fileName, outcome.bytes, session), notice };
   } catch {
     return {
-      ...state,
+      file: { ...state.file, session },
       notice: {
         level: 'error',
         message: `保存したファイルを読み込み直せませんでした。元の内容は ${outcome.backupName} にあります。`,
