@@ -1,0 +1,9 @@
+# 実データは絶対にコミットしない（サンプルのみ許可）
+*.def
+!samples/*.sample.def
+
+# Windows のダウンロード印
+*:Zone.Identifier
+
+node_modules/
+dist/
