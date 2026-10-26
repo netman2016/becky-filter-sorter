@@ -1,0 +1,35 @@
+{
+  "name": "becky-filter-sorter",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Becky! の IFilter.def（振り分けルール）を並び替えるブラウザアプリ（非公式）",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": "^20.19.0 || >=22.12.0"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -b",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "gen:sample": "node scripts/gen-sample.mjs",
+    "test:real": "vitest run tests/real-file.test.ts --reporter=verbose"
+  },
+  "dependencies": {
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^6.0.0",
+    "iconv-lite": "^0.7.0",
+    "typescript": "~6.0.0",
+    "vite": "^8.0.0",
+    "vitest": "^4.1.12"
+  }
+}
