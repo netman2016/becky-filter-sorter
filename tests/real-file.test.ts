@@ -4,7 +4,7 @@
 // パス・フォルダ名・アドレス・条件文字列は出力しない（バイト比較に toEqual を使わないのもそのため）。
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { firstMismatch, isOnlyReordered, parseIFilter, serialize } from '../src/core';
+import { analyzeRules, firstMismatch, isOnlyReordered, parseIFilter, serialize } from '../src/core';
 import { mismatchMessage } from './helpers';
 
 const realPath = process.env.IFILTER_REAL_PATH;
@@ -27,6 +27,11 @@ describe.skipIf(!realPath)('実ファイル検証', () => {
     for (const w of warnings) warningCounts[w.kind] = (warningCounts[w.kind] ?? 0) + 1;
     const conditionCount = doc.rules.reduce((n, r) => n + r.conditions.length, 0);
 
+    // 並び順による警告（件数のみ。内容は出さない）
+    const analysis = analyzeRules(doc.rules, ids);
+    const conditionStates = { shadowed: 0, redundant: 0, free: 0 };
+    for (const a of analysis.byId.values()) for (const c of a.conditions) conditionStates[c.kind]++;
+
     console.log(
       [
         `ルール数: ${doc.rules.length}`,
@@ -35,6 +40,10 @@ describe.skipIf(!realPath)('実ファイル検証', () => {
         `ラウンドトリップ: ${mismatchMessage(roundTrip)}`,
         `反転して戻す: ${mismatchMessage(restored)}`,
         `順序のみの変更と判定: ${onlyReordered ? 'はい' : 'いいえ'}`,
+        `警告（ルール数）: 到達不能 ${analysis.counts.unreachable} / 一部到達不能 ${analysis.counts['partially-unreachable']}` +
+          ` / 冗長 ${analysis.counts['redundant-rule']} / 一部冗長 ${analysis.counts['partially-redundant']}` +
+          ` / 同一ルール内の重複 ${analysis.counts.duplicate} / 判定対象外 ${analysis.counts['not-applicable']}`,
+        `条件の状態（条件数）: 遮蔽 ${conditionStates.shadowed} / 冗長 ${conditionStates.redundant} / 自由 ${conditionStates.free}`,
       ].join('\n'),
     );
 

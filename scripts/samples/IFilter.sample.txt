@@ -65,3 +65,32 @@ $O:Sort=1
 @0:*:X-Spam-Flag: YES	O	I
 $O:Sort=1
 :End ""
+:Begin ""
+!M:0000abcd.mb\!!!!Inbox\お知らせ\メルマガ\
+@0:From:NEWS@EXAMPLE.ORG	O	I
+@0:[body]:配信停止はこちらから	O	I
+$O:Sort=1
+:End ""
+:Begin ""
+!M:0000abcd.mb\!!!!Inbox\ソフト\サポート\
+@0:Subject:機能要望の件	O	I
+@0:Subject:サポート窓口	O	I
+$O:Sort=1
+:End ""
+:Begin ""
+!M:0000abcd.mb\!!!!Inbox\仕事\定例\
+@0:Subject:定例会議	O	I
+@0:subject:定例会議	O	I
+$O:Sort=1
+:End ""
+:Begin ""
+!M:0000abcd.mb\!!!!Inbox\取引先\
+@0:*:@example.jp	O	I
+$O:Sort=1
+:End ""
+:Begin ""
+!M:0000abcd.mb\!!!!Inbox\取引先\担当\
+@0:From:info@example.jp	O	I
+@0:[body]:@example.jp	O	I
+$O:Sort=1
+:End ""

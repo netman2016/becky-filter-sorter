@@ -12,7 +12,7 @@ describe('ラウンドトリップ（パース → シリアライズでバイ�
   it('架空サンプル', () => {
     const input = readSample();
     expectRoundTrip(input);
-    expect(parseIFilter(input).doc.rules).toHaveLength(10);
+    expect(parseIFilter(input).doc.rules).toHaveLength(15);
   });
 
   it('空ファイル', () => {

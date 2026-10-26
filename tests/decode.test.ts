@@ -35,6 +35,11 @@ describe('デコード（架空サンプル）', () => {
       'Inbox\\仕事\\',
       'Inbox\\迷惑メール\\',
       'Inbox\\ゴミ箱候補\\',
+      'Inbox\\お知らせ\\メルマガ\\',
+      'Inbox\\ソフト\\サポート\\',
+      'Inbox\\仕事\\定例\\',
+      'Inbox\\取引先\\',
+      'Inbox\\取引先\\担当\\',
     ]);
     expect(new Set(doc.rules.map((r) => r.destMailbox))).toEqual(new Set(['0000abcd.mb']));
   });
