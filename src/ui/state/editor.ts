@@ -13,6 +13,9 @@ import { orderAfterDrop } from './dropIndex';
 
 const HISTORY_LIMIT = 500;
 
+/** 「10件上 / 10件下」で動かす件数（全体の並び順での件数） */
+export const PAGE_MOVE_STEP = 10;
+
 export type Notice = { level: 'info' | 'error'; message: string };
 
 export type LoadedFile = {
@@ -279,6 +282,11 @@ function abortReason(outcome: Extract<SaveOutcome, { kind: 'aborted' }>): string
     case 'error':
       return `ファイル操作に失敗しました${outcome.errorName ? `（${outcome.errorName}）` : ''}。`;
   }
+}
+
+/** 選択中のルールを delta だけ動かせるか（1 件も動かせないときは false。ボタンの無効化に使う） */
+export function canMoveBy(file: LoadedFile, delta: number): boolean {
+  return file.selection.length > 0 && !sameOrder(moveRulesBy(file.order, file.selection, delta), file.order);
 }
 
 /** 並び順が基準と違うか */

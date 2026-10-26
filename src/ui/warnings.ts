@@ -1,4 +1,4 @@
-import type { ConditionStatus, RuleAnalysis, RuleWarningKind } from '../core';
+import type { ConditionStatus, RuleAnalysis, RuleWarningKind, WarningTargetKind } from '../core';
 
 export type WarningFilter = 'all' | 'warnings' | 'unreachable';
 
@@ -39,6 +39,15 @@ const DUPLICATE_BADGE: Badge = {
   title: '同じルールの中に、同一の条件が複数あります',
 };
 
+/** 警告の件数サマリーで、クリックして順次選択できる種類のバッジ */
+export const WARNING_TARGET_BADGES: Record<WarningTargetKind, Badge> = {
+  unreachable: KIND_BADGES.unreachable!,
+  'partially-unreachable': KIND_BADGES['partially-unreachable']!,
+  'redundant-rule': KIND_BADGES['redundant-rule']!,
+  'partially-redundant': KIND_BADGES['partially-redundant']!,
+  duplicate: DUPLICATE_BADGE,
+};
+
 /** 行に表示するバッジ（色だけに頼らずラベルを出す） */
 export function badgesOf(analysis: RuleAnalysis | undefined): Badge[] {
   if (!analysis) return [];
@@ -53,6 +62,23 @@ export function matchesFilter(analysis: RuleAnalysis | undefined, filter: Warnin
   if (filter === 'all') return true;
   if (filter === 'unreachable') return analysis?.kind === 'unreachable';
   return badgesOf(analysis).length > 0;
+}
+
+/**
+ * ジャンプしたあとの絞り込み。移動先が表示中なら今の絞り込みのまま、非表示なら「すべて」に戻す。
+ * visibleIds は絞り込みの条件に合う行の集合で、「（絞り込み外）」として残している選択行は含めない。
+ */
+export function filterAfterJump(
+  current: WarningFilter,
+  targetId: string,
+  visibleIds: ReadonlySet<string>,
+): WarningFilter {
+  return current === 'all' || visibleIds.has(targetId) ? current : 'all';
+}
+
+/** 警告の種類から順次選択したときの、スクリーンリーダー向けの通知文 */
+export function warningJumpMessage(kind: WarningTargetKind, index: number, total: number): string {
+  return `${WARNING_TARGET_BADGES[kind].label} ${total}件中${index}件目を選択しました`;
 }
 
 export const STATUS_LABELS: Record<ConditionStatus['kind'], string> = {

@@ -9,7 +9,7 @@ import { WarningSummary } from './ui/components/WarningSummary';
 import { browserSaveEnv, isFileSystemAccessSupported, openFile, saveFile } from './ui/fs/fileAccess';
 import { backupFileName } from './ui/fs/outcome';
 import { editorReducer, initialEditorState, isDirty } from './ui/state/editor';
-import { matchesFilter, type WarningFilter } from './ui/warnings';
+import { filterAfterJump, matchesFilter, type WarningFilter } from './ui/warnings';
 
 function isEditableTarget(target: EventTarget | null): boolean {
   return (
@@ -79,12 +79,18 @@ export default function App() {
     [order, analysisById],
   );
 
+  // 絞り込みの条件に合う行（「（絞り込み外）」として残している選択行は含めない）
+  const matchingIds = useMemo(
+    () => new Set((order ?? []).filter((id) => matchesFilter(analysisById.get(id), filter))),
+    [order, analysisById, filter],
+  );
+
   const jumpTo = useCallback(
     (id: string) => {
-      if (!matchesFilter(analysisById.get(id), filter)) setFilter('all');
+      setFilter(filterAfterJump(filter, id, matchingIds));
       dispatch({ type: 'jumpTo', id });
     },
-    [analysisById, filter],
+    [filter, matchingIds],
   );
 
   const canSave = dirty && verified;

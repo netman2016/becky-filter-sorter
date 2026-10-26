@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { serialize } from '../../src/core';
 import {
+  canMoveBy,
   canSave,
   describeSaveOutcome,
   editorReducer,
   initialEditorState,
   isDirty,
+  PAGE_MOVE_STEP,
   type EditorAction,
   type EditorState,
 } from '../../src/ui/state/editor';
@@ -236,5 +238,48 @@ describe('絞り込み中の選択（表示中の行が対象）', () => {
     expect(s.file!.selection).toEqual(['r0005']);
     expect(s.file!.focusId).toBe('r0005');
     expect(run(s, { type: 'jumpTo', id: 'r9999' })).toBe(s);
+  });
+});
+
+describe('10件上 / 10件下', () => {
+  it('10 件の移動は履歴 1 件で、Undo 1 回で戻り Redo で再現する', () => {
+    const start = run(loaded(15), click('r0002'));
+    const moved = run(start, { type: 'moveBy', delta: PAGE_MOVE_STEP });
+    expect(moved.file!.order.indexOf('r0002')).toBe(11);
+    expect(moved.file!.past).toHaveLength(1);
+    const undone = run(moved, { type: 'undo' });
+    expect(undone.file!.order).toEqual(start.file!.order);
+    expect(run(undone, { type: 'redo' }).file!.order).toEqual(moved.file!.order);
+  });
+
+  it('端に当たったらそこで止まり、1 件も動かせないときは履歴に積まない', () => {
+    const s = run(loaded(15), click('r0002'), { type: 'moveBy', delta: -PAGE_MOVE_STEP });
+    expect(s.file!.order[0]).toBe('r0002');
+    expect(s.file!.past).toHaveLength(1);
+    const top = run(loaded(15), click('r0001'));
+    expect(run(top, { type: 'moveBy', delta: -PAGE_MOVE_STEP })).toBe(top);
+  });
+
+  it('canMoveBy: 選択なし・端で動かせないときは false', () => {
+    const none = loaded(15).file!;
+    expect(canMoveBy(none, PAGE_MOVE_STEP)).toBe(false);
+    const top = run(loaded(15), click('r0001')).file!;
+    expect(canMoveBy(top, -PAGE_MOVE_STEP)).toBe(false);
+    expect(canMoveBy(top, PAGE_MOVE_STEP)).toBe(true);
+    const bottom = run(loaded(15), click('r0014'), click('r0015', { ctrl: true })).file!;
+    expect(canMoveBy(bottom, PAGE_MOVE_STEP)).toBe(false);
+    expect(canMoveBy(bottom, -PAGE_MOVE_STEP)).toBe(true);
+  });
+});
+
+describe('警告の種類からのジャンプ（jumpTo）', () => {
+  it('選択・現在位置だけが変わり、並び順の履歴には積まない', () => {
+    const before = run(loaded(), click('r0001'), { type: 'moveBy', delta: 1 }, { type: 'undo' });
+    const after = run(before, { type: 'jumpTo', id: 'r0004' });
+    expect(after.file!.selection).toEqual(['r0004']);
+    expect(after.file!.anchorId).toBe('r0004');
+    expect(after.file!.order).toBe(before.file!.order);
+    expect(after.file!.past).toBe(before.file!.past);
+    expect(after.file!.future).toBe(before.file!.future);
   });
 });
