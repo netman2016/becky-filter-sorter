@@ -23,3 +23,4 @@ Becky! の `IFilter.def`（メール振り分けルール）を並び替える�
 - まず Phase 1（MVP）のみ。Phase 2 以降は着手しない
 - 仕様に迷う点・未確定事項（SPEC.md §10）は、実装を止めて確認する
 - 作業の区切りでテストを実行し、結果を報告する
+- 公開前チェック: `npm run check:domains`（CI でも実行）、`npm run check:dist`（build 後）、`npm run check:public`（手元専用。検索語は標準入力で渡し、ファイル・ログに残さない）
