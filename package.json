@@ -16,7 +16,10 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "gen:sample": "node scripts/gen-sample.mjs",
-    "test:real": "vitest run tests/real-file.test.ts --reporter=verbose"
+    "test:real": "vitest run tests/real-file.test.ts --reporter=verbose",
+    "check:domains": "node scripts/public-check/domains.mjs",
+    "check:public": "node scripts/public-check/public.mjs",
+    "check:dist": "node scripts/public-check/dist.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
