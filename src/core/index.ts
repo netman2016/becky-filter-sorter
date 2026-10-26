@@ -12,4 +12,4 @@ export { bytesEqual, firstMismatch } from './bytes';
 export { decodeCp932 } from './decode';
 export { parseIFilter } from './parse';
 export { orderedRules, serialize } from './serialize';
-export { isOnlyReordered, moveRules } from './reorder';
+export { isOnlyReordered, movedRuleIds, moveRules, moveRulesBy } from './reorder';
